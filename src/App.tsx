@@ -16,10 +16,13 @@ import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from 'firebase/auth';
 import { getFirestore, doc, setDoc, onSnapshot } from 'firebase/firestore';
 
-const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {};
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
+// Firebase configuration is supplied by the original hosted editor.  GitHub
+// Pages does not inject it, so the UI remains usable there without cloud sync.
+const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+const hasFirebaseConfig = Boolean(firebaseConfig?.apiKey);
+const app = hasFirebaseConfig ? initializeApp(firebaseConfig) : null;
+const auth = app ? getAuth(app) : null;
+const db = app ? getFirestore(app) : null;
 const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
 
 const PremiumIcons = {
@@ -251,6 +254,10 @@ export default function App() {
   const localDataRef = useRef(JSON.stringify(INITIAL_PROFILES));
 
   useEffect(() => {
+    if (!auth) {
+      setIsDbLoaded(true);
+      return;
+    }
     const initAuth = async () => {
       if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
         await signInWithCustomToken(auth, __initial_auth_token);
@@ -268,7 +275,7 @@ export default function App() {
   }, [profilesData]);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user || !db) return;
     const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'macroData', 'profiles');
     const unsub = onSnapshot(docRef, (docSnap) => {
       if (docSnap.exists()) {
@@ -283,7 +290,7 @@ export default function App() {
   }, [user]);
 
   useEffect(() => {
-    if (!isDbLoaded || !user) return;
+    if (!isDbLoaded || !user || !db) return;
     const docRef = doc(db, 'artifacts', appId, 'users', user.uid, 'macroData', 'profiles');
     setDoc(docRef, { profilesData });
   }, [profilesData, isDbLoaded, user]);
